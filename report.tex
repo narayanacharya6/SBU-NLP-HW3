@@ -1,0 +1,152 @@
+\documentclass[11pt]{article}
+% Packages used by instructor %
+\usepackage{amsmath,amssymb,xspace,epsfig}
+
+% Package used for setting up page margins %
+\usepackage{geometry}
+%\usepackage{showframe} % Used to clearly show the new margins %
+\newgeometry{vmargin={1in}, hmargin={1in,1in}}
+
+% Package used for adding hyperlinks %
+\usepackage{hyperref}
+\usepackage[anythingbreaks]{breakurl}
+
+% Package for multirow tables %
+\usepackage{multirow}
+\renewcommand{\arraystretch}{1.5}
+
+% Package for Bib in ToC %
+\usepackage[nottoc]{tocbibind}
+
+\usepackage{subcaption}
+\usepackage{wrapfig}
+
+% Page Header %
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{Natural Language Processing\\ Home Work 3}
+\rhead{Narayan Acharya \\ 112734365}
+\lfoot{}
+\rfoot{\thepage}
+
+\renewcommand{\headrulewidth}{1pt}
+\renewcommand{\footrulewidth}{1pt}
+
+\title{
+	Natural Language Processing - Home Work 3\\[2mm]
+	\large CSE 538 Fall '19\\[1mm]
+	\textit{Prof. Niranjan Balasubramaniam}
+}
+\author{
+	\small Submission By: \\
+	\href{mailto:nacharya@cs.stonybrook.edu}{Narayan Acharya} \\
+	\small 112734365
+}
+\date{\vspace{-5ex}}
+\begin{document}
+	
+% Set up title
+\maketitle
+\thispagestyle{fancy} % Make this page use fancy header
+
+% Set up Table of Contents
+\tableofcontents
+
+\section{Model Implementation}
+\begin{enumerate}
+
+\item \textbf{Model Architecture:} 
+
+Our model is a neural network for dependency parsing. We try to emulate the dependency parser as mentioned in the paper \cite{DependencyParserNeuralNetwork}. In accordance with the model architecture in the paper we build a 2 layer architecture.
+
+For the first layer, we have $hidden\_dim$ number of units. The first layer is followed by an activation function. The paper mentions the comparison of various possible activation functions, namely, cubic, hyperbolic tangent and sigmoid. We try each as part of our experiments and analyse the results from each. The next layer contains $num\_transitions$ number of units, with each unit corresponding to the probability of it being the next transition in constructing the parse tree. We get the probabilities by applying a softmax function to the second layer.
+
+The first layer has two variables that we intend to learn, the weight matrix $W^1$ and bias $b^1$, while the second layer has a single weight matrix $W^2$. Given we have to learn these, it is critical to come up with the good initial values for these weights and biases. We use Xavier initialization for both the weights, $W^1$ and $W^2$, and we start with zeros for the bias $b^1$ in layer 1. We also learn the embeddings as part of our experiments. In cases where we do wish to learn the embeddings as well, we initialize them between -0.01 and 0.01 using a uniform random initializer.
+
+\textit{NOTE:} The paper denotes weights for layer 1 using 3 separate matrices, one for each - words, Part of Speech (PoS) tags and labels. We can get away with just 1 weight matrix, $W^1$ in our case, by simply concatenating the columns of the 3 matrices. In order for this to work, we also need to make smarter ways of reshaping our input matrices coming into the model. This is to ensure that the matrix calculations we do end up having the same effect as if the single weight matrix were 3 separate matrices like we have in the paper.
+
+\item \textbf{Model Forward Propagation:}
+
+The input to the first layer is a matrix of embeddings of the tokens. We reshape these inputs into a long one dimensional vector as to conform to the requirements of the input to the first layer of our model.
+
+Forward propagation is greatly simplified due to the use of single weight matrix in layer 1. We multiply the inputs coming in with $W^1$ and then add the bias $b^1$ to the result. Next we pass the computed value through our activation function to get the output of the first layer of our architecture. The default activation function is cubic, as suggested in the paper. The output of the first layer is then passed through to the second layer. The output of the second layer is just multiplying the input with weight matrix $W^2$.
+
+\item \textbf{Loss Calculation:}
+
+When we are training the model, we also need to compute the loss for back propagation which will update our trainable variables, $ W^1 $, $ b^1 $, $ W^2 $ and our embeddings when they are trainable. The loss we calculate has 2 components, the cross entropy loss and a regularization term, which are added to compute the final loss.
+
+\begin{enumerate}
+	\item Cross Entropy Loss: As mentioned in the paper, we do \textbf{not} calculate the cross entropy loss for all the logits from layer 2, but only for the feasible transitions. Thus, we mask out the transitions with labels $ < 0 $ and compute the softmax for all the other transitions. We calculate the "stable softmax" instead of the regular softmax to protect against underflowing and overflowing problems when we encounter unusually small or large values in our logits. We also add a small noise ($e^{-9}$) while taking the log of softmax while calculating the cross entropy loss. We do this to avoid taking a log of 0 when the softmax is 0. Finally, we take the mean value of the cross entropy loss over the entire batch.
+	
+	\item Regularization: The regularization term consists of L2 loss for our trainable variables. We include the embeddings as part of the regularization term only when they are trainable. We multiply the sum of the L2 loss for our trainable variables with the regularization parameter ($\lambda$) to compute the regularization.
+	
+\end{enumerate}
+
+\item \textbf{Model Features:}
+
+The features to our model are extracted from the state of the configuration after various transitions are applied. The configuration is representative of the stack, the buffer and set of dependency arcs. The transitions are carried out based on the rules as mentioned in \cite{DependencyParserNeuralNetwork} based on the possible transitions as mentioned in \cite{DeterministicDependencyParsing}. We have 3 different transition options at any given time, LEFT-ARC, RIGHT-ARC or SHIFT but we can apply these only if certain conditions are  met. For. eg. We cannot add a LEFT-ARC of RIGHT-ARC if there are less than 2 elements in the stack and we cannot SHIFT something from the buffer to the stack if the buffer is empty.
+
+The features are from the state of the stack, buffer and parse tree at that instance of the parsing of the sentence. What we wish to predict is the next transition of all the possible transitions at that instance. This will help with generating a better dependency parse tree as we make the best possible guess for adding an arc to the parse at any given state. We extract certain features, 48 in total, as mentioned \cite{DependencyParserNeuralNetwork}. 18 of these are for the words, another 18 for the PoS tags and 12 features for dependency arcs.
+
+\end{enumerate}
+
+\section{Experiments}
+
+\begin{table}[]
+	\begin{tabular}{|l|l|l|l|l|l|l|l|l|l|l|}
+		\hline
+		Exp & Activation & \begin{tabular}[c]{@{}l@{}}Pre-Trained \\ Embeddings\end{tabular} & Loss & UAS & $UAS^-$ & LAS & $LAS^-$ & UEM & $UEM^-$ & ROOT \\ \hline
+		1 & Cubic & YES & 0.10 & 88.00 & \textbf{89.63} & 85.39 & 86.67 & 34.06 & 36.65 & 90.12 \\ \hline
+		2 & Tanh & YES & 0.13 & 87.13 & 88.80 & 84.74 & 86.10 & 33.12 & 35.88 & 88.06 \\ \hline
+		3 & Sigmoid & YES & 0.17 & 85.92 & 87.70 & 83.47 & 84.93 & 30.24 & 32.41 & 87.06 \\ \hline
+		4 & Cubic & NO & 0.09 & 85.02 & 86.88 & 82.62 & 84.17 & 27.76 & 30.47 & 82.71 \\ \hline
+		5 & Cubic & YES* & 0.14 & 84.92 & 86.73 & 82.17 & 83.65 & 29.59 & 31.83 & 86.18 \\ \hline
+	\end{tabular}
+	\caption{Experiment Results}
+	\label{tab:ExpResults}
+\end{table}
+
+\begin{enumerate}
+	
+	\item The results in \ref{tab:ExpResults} are for the 5 experiments carried out. The numbers reported are numbers after the 5 epochs run for each experiment. Below are the meanings of some of the relevant columns \cite{Evaluations1} \cite{Evaluations2}.
+	
+	\begin{enumerate}
+		\item Activation: The activation function used in layer 1 of our model.
+		\item Pre-Trained Embeddings: Whether pre-trained embeddings were used for training. NOTE: The 5th experiment did use pre-trained embeddings but they were not trainable.
+		\item Loss: The average training loss for that epoch.
+		\item UAS: Unlabeled Attachment Score - Percentage of words that get the correct head.
+		\item $UAS^-$: Unlabeled Attachment Score (Without Punctuation) - Percentage of words that get the correct head. Here we disregard punctuation tokens.
+		\item LAS: Labeled Attachment Score - Percentage of words that get the correct head and the label.
+		\item $LAS^-$: Unlabeled Attachment Score (Without Punctuation) - Percentage of words that get the correct head and the label. Here we disregard punctuation tokens.
+		\item UEM: Unlabeled Attachment Score with Exact Match - Percentage of exact match dependency parse trees.
+		\item $UEM^-$: Unlabeled Attachment Score with Exact Match (Without Punctuation)- Percentage of exact match dependency parse trees. Here we disregard punctuation tokens.
+	\end{enumerate}
+
+	\item The $ UAS^- $ score of 89.63\% is very close to the numbers reported in the paper for the cubic activation function. \cite{DependencyParserNeuralNetwork}. \textbf{NOTE:} The paper's mention of UAS/LAS is equivalent to $UAS^-$/$LAS^-$ over here as all numbers reported for UAS/LAS are without punctuation in the paper.
+	
+	\item Cubic activation function does out-perform hyperbolic tangent and sigmoid as can be seen from the results above. Cubic beats both these activations by almost 1\% and 2\% respectively when it comes to $UAS^-$.
+	
+	\item Use of pre-trained embeddings is also a positive factor. Experiment 4, the one without the pre-trained embeddings performed poorly compared to the experiments where pre-trained embeddings were used with any of the three activation functions. It only managed to get an accuracy of 86.88\% for $UAS^-$. 
+	
+	\item For the last experiment, we use pre-trained embeddings but do not train/learn them over the course of the training. This model managed a accuracy slightly poor than the model without the pre-trained embeddings for the metrics for head and labels but somehow did well on the exact tree matches and ROOT scores.
+		
+\end{enumerate}
+
+\bibliographystyle{unsrt}
+\begin{thebibliography}{9}
+	\bibitem{DependencyParserNeuralNetwork}
+	[Chen and Manning, 2014] Chen, D. and Manning, C. (2014). A fast and accurate dependency parser using neural networks. In Proceedings of the 2014	conference on empirical methods in natural language processing (EMNLP), pages 740-750.,
+	\\\texttt{\burl{https://nlp.stanford.edu/pubs/emnlp2014-depparser.pdf}}
+	\bibitem{DeterministicDependencyParsing}
+	[Nivre, 2004] Nivre, J. (2004). Incrementality in deterministic dependency parsing. In Proceedings of the Workshop on Incremental Parsing: Bringing Engineering and Cognition Together, pages 50-57. Association for Computational Linguistics.,
+	\\\texttt{\burl{https://pdfs.semanticscholar.org/0329/06f0d86fd6bbf7512d3fffd06fcb83593012.pdf}}
+	\bibitem{Evaluations1}
+	NLP Dependency Parsing Lecture Slides by Joakim Nivre,
+	\\\texttt{\burl{https://cl.lingfil.uu.se/~nivre/master/NLP-DepParsing.pdf}}
+	\bibitem{Evaluations2}
+	Transition-based dependency parsing Lecture Slides by Sara Stymne
+	\\\texttt{\burl{https://cl.lingfil.uu.se/~sara/kurser/5LN455-2014/lectures/5LN455-F8.pdf}}
+\end{thebibliography}
+	
+\end{document}
