@@ -1,8 +1,16 @@
+This file is best viewed in Markdown reader (eg. https://jbt.github.io/markdown-editor/)
+
+# Credits:
+
+Most of this code has been directly taken from the authors of:
+
+> From A Fast and Accurate Dependency Parser using Neural Networks (2014, Danqi and Manning)
+
+We have adapted it to work with tensorflow2.0, and changed it to similar format as assignment 2. Also thanks to previous TA, Heeyoung Kwon who set up the original assignment.
+
 # Overview
 
-This is the third assignment for the course NLP (CSE-538) at Stony Brook University during Fall 19.
-
-This repo is an implementation of a neural Dependency Parsing model by using the following papers as a guide:
+You will implement a neural Dependency Parsing model by writing code for the following:
 
 From Incrementality in Deterministic Dependency Parsing (2004, Nivre)
 - the arc-standard algorithm
@@ -52,6 +60,10 @@ For quick code development/debugging, this time we have explicitly provided smal
 
 # Code Overview
 
+
+This repository largely follows the same interface as assignment 2.
+
+
 ## Train, Predict, Evaluate
 
 
@@ -82,6 +94,9 @@ python evaluate.py serialization_dirs/default \
                    dev_predictions.conll
 ```
 
+**NOTE:** These scripts will not work until you fill-up the placeholders (TODOs) left out as part of the assignment.
+
+
 
 ## Dependency Parsing
 
@@ -100,17 +115,49 @@ python evaluate.py serialization_dirs/default \
   - `constants.py`: Sets project-wide constants for the project.
 
 
+# Expectations
+
+## What to write in code:
+
+Like assignment 2 you have `TODO(Students) Start` and `TODO(Students) End` annotations. You are expected to write your code between those comment/annotations.
+
+1. Implement the arc-standard algorithm in `parsing_system.py`: `apply` method
+2. Implement feature extraction in `data.py`: `get_configuration_features` method
+3. Implement neural network architecture in `model.py` in `DependencyParser` class: `__init__` and `call` method.
+4. Implement loss function for neural network in `model.py` in `DependencyParser` class: `compute_loss` method.
+
 
 ## What experiments to try
 
-You can try experiments to figure out the effects of following on learning:
+You should try experiments to figure out the effects of following on learning:
 
 1. activations (cubic vs tanh vs sigmoid)
 2. pretrained embeddings
 3. tunability of embeddings
 
-The file `experiments.sh` enlists the commands you will need to train and save these models.
+and write your findings in the report.
+
+The file `experiments.sh` enlists the commands you will need to train and save these models. In all you will need ~5 training runs, each taking about 30 minutes on cpu. See `colab_notes.md` to run experiments on gpu.
 
 As shown in the `experiments.sh`, you can use `--experiment-name` argument in the `train.py` to store the models at different locations in `serialization_dirs`. You can also use `--cache-processed-data` and `--use-cached-data` flags in `train.py` to not generate the training features everytime. Please look at training script for details. Lastly, after training your dev results will be stored in serialization directory of the experiment with name `metric.txt`.
 
-Take a look at the report.pdf to find my report and findings as part of this assignment.
+**NOTE**: You will be reporting the scores on development set and submitting to use the test prediction of the configuration that you found the best. The labels of test dataset are hidden from you.
+
+
+## What to turn in?
+
+A single zip file containing the following files:
+
+1. parsing_system.py
+2. data.py
+3. model.py
+4. test_predictions.conll
+5. gdrive_link.txt
+6. report.pdf
+
+`gdrive_link.txt` should have a link to the `serialization_dirs.zip` of your trained models.
+
+We will release the exact zip format on piazza in a couple of days.
+
+### Good Luck!
+UAS
